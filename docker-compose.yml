@@ -12,9 +12,64 @@ services:
       - db-data:/var/lib/postgresql/data
       - ./postgres/:/docker-entrypoint-initdb.d/
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
-# TODO добавить сервисы
+  loyalty:
+    build:
+      context: .
+      dockerfile: src/LoyaltyService/Dockerfile
+    environment:
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=loyalties;Username=program;Password=test
+    ports:
+      - "8050:8050"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  payment:
+    build:
+      context: .
+      dockerfile: src/PaymentService/Dockerfile
+    environment:
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=payments;Username=program;Password=test
+    ports:
+      - "8060:8060"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reservation:
+    build:
+      context: .
+      dockerfile: src/ReservationService/Dockerfile
+    environment:
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=reservations;Username=program;Password=test
+    ports:
+      - "8070:8070"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: src/GatewayService/Dockerfile
+    environment:
+      Services__Reservation: http://reservation:8070
+      Services__Payment: http://payment:8060
+      Services__Loyalty: http://loyalty:8050
+    ports:
+      - "8080:8080"
+    depends_on:
+      - reservation
+      - payment
+      - loyalty
 
 volumes:
   db-data:
